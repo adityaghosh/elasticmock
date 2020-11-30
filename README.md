@@ -2,7 +2,9 @@
 
 Python Elasticsearch Mock for test purposes
 
-[![Build Status](https://travis-ci.org/vrcmarcos/elasticmock.svg?branch=master)](https://travis-ci.org/vrcmarcos/elasticmock) [![Coverage Status](https://coveralls.io/repos/github/vrcmarcos/elasticmock/badge.svg?branch=master)](https://coveralls.io/github/vrcmarcos/elasticmock?branch=master) [![PyPI version](https://badge.fury.io/py/ElasticMock.svg)](https://badge.fury.io/py/ElasticMock) [![Code Health](https://landscape.io/github/vrcmarcos/elasticmock/master/landscape.svg?style=flat)](https://landscape.io/github/vrcmarcos/elasticmock/master) [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/vrcmarcos/elasticmock/master/LICENSE) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/ElasticMock)
+[![Build Status](https://travis-ci.org/vrcmarcos/elasticmock.svg?branch=master)](https://travis-ci.org/vrcmarcos/elasticmock) [![Coverage Status](https://coveralls.io/repos/github/vrcmarcos/elasticmock/badge.svg?branch=master)](https://coveralls.io/github/vrcmarcos/elasticmock?branch=master) [![PyPI version](https://badge.fury.io/py/ElasticMock.svg)](https://badge.fury.io/py/ElasticMock) [![GitHub license](https://img.shields.io/github/license/vrcmarcos/elasticmock)](https://github.com/vrcmarcos/elasticmock/blob/master/LICENSE) ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/ElasticMock) ![ElasticSearch Version](https://img.shields.io/badge/elasticsearch-1%20%7C%202%20%7C%205%20%7C%206%20%7C%207-blue) 
+
+![Libraries.io dependency status for latest release](https://img.shields.io/librariesio/release/pypi/elasticmock) [![Downloads](https://pepy.tech/badge/elasticmock/month)](https://pepy.tech/project/elasticmock/month)
 
 ## Installation
 
@@ -25,6 +27,90 @@ class TestClass(TestCase):
     @elasticmock
     def test_should_return_something_from_elasticsearch(self):
         self.assertIsNotNone(some_function_that_uses_elasticsearch())
+```
+
+### Custom Behaviours
+
+You can also force the behaviour of the ElasticSearch instance by importing the `elasticmock.behaviour` module:
+
+```python
+from unittest import TestCase
+
+from elasticmock import behaviour
+
+
+class TestClass(TestCase):
+
+    ...
+
+    def test_should_return_internal_server_error_when_simulate_server_error_is_true(self):
+        behaviour.server_failure.enable()
+        ...
+        behaviour.server_failure.disable()
+```
+
+You can also disable all behaviours by calling `behaviour.disable_all()` (Consider put this in your `def tearDown(self)` method)
+
+#### Available Behaviours
+
+* `server_failure`: Will make all calls to ElasticSearch returns the following error message:
+    ```python
+    {
+        'status_code': 500,
+        'error': 'Internal Server Error'
+    }
+    ```
+
+## Code example
+
+Let's say you have a prod code snippet like this one:
+
+```python
+import elasticsearch
+
+class FooService:
+
+    def __init__(self):
+        self.es = elasticsearch.Elasticsearch(hosts=[{'host': 'localhost', 'port': 9200}])
+
+    def create(self, index, body):
+        es_object = self.es.index(index, body)
+        return es_object.get('_id')
+
+    def read(self, index, id):
+        es_object = self.es.get(index, id)
+        return es_object.get('_source')
+
+```
+
+Than you should be able to test this class by mocking ElasticSearch using the following test class:
+
+```python
+from unittest import TestCase
+from elasticmock import elasticmock
+from foo.bar import FooService
+
+class FooServiceTest(TestCase):
+
+    @elasticmock
+    def should_create_and_read_object(self):
+        # Variables used to test
+        index = 'test-index'
+        expected_document = {
+            'foo': 'bar'
+        }
+
+        # Instantiate service
+        service = FooService()
+
+        # Index document on ElasticSearch
+        id = service.create(index, expected_document)
+        self.assertIsNotNone(id)
+
+        # Retrive dpcument from ElasticSearch
+        document = service.read(index, id)
+        self.assertEquals(expected_document, document)
+
 ```
 
 ## Notes:
@@ -91,6 +177,36 @@ python setup.py test
 
 ## Changelog
 
+#### 1.6.1:
+- Fix Twine README.md
+
+#### 1.6.0:
+- [Implements several basic search types](https://github.com/vrcmarcos/elasticmock/pull/42) (Thanks [@KyKoPho](https://github.com/KyKoPho))
+- [Allow ignoring of missing documents (404) for get and delete](https://github.com/vrcmarcos/elasticmock/pull/44) (Thanks [@joosterman](https://github.com/joosterman))
+
+#### 1.5.1:
+- [Fix tests for es > 7](https://github.com/vrcmarcos/elasticmock/pull/38) (Thanks [@chesstrian](https://github.com/chesstrian))
+
+#### 1.5.0:
+- [**FakeElasticSearch**: Mocked **indices** property](https://github.com/vrcmarcos/elasticmock/issues/22)
+  - **FakeIndicesClient**: Mocked **create**, **exists**, **refresh** and **delete** methods
+- [**FakeElasticSearch**: Mocked **cluster** property](https://github.com/vrcmarcos/elasticmock/issues/8)
+  - **FakeClusterClient**: Mocked **health** method
+
+#### 1.4.0
+
+- [Fix es.index regression issue](https://github.com/vrcmarcos/elasticmock/issues/34)
+- [Add 'Force Server Failure' feature as requested](https://github.com/vrcmarcos/elasticmock/issues/28)
+- Reformat code to be compliant with PEP8
+- Add support to Python 3.8
+
+#### 1.3.7
+
+- [Adding fix for updating existing doc using index](https://github.com/vrcmarcos/elasticmock/pull/32) (Thanks [@adityaghosh](https://github.com/adityaghosh))
+- [Added bulk method](https://github.com/vrcmarcos/elasticmock/pull/30) (Thanks [@charl-van-niekerk](https://github.com/charl-van-niekerk))
+- [Add default value to doc_type in index method as it is by default set to '\_doc'](https://github.com/vrcmarcos/elasticmock/pull/27) (Thanks [@mohantyashish109](https://github.com/mohantyashish109))
+- [Add support for Python 3.7](https://github.com/vrcmarcos/elasticmock/pull/25) (Thanks [@asherf](https://github.com/asherf))
+
 #### 1.3.6
 
 - [Fix installation issue](https://github.com/vrcmarcos/elasticmock/pull/20) (Thanks [@tdhopper](https://github.com/tdhopper))
@@ -108,7 +224,7 @@ python setup.py test
 
 - [Search: doc_type can be a list](https://github.com/vrcmarcos/elasticmock/pull/16) (Thanks [@garncarz](https://github.com/garncarz))
 - [Exclude tests package](https://github.com/vrcmarcos/elasticmock/pull/13) (Thanks [@jmlw](https://github.com/jmlw))
-- [Make the FakeElasticsearch __init__ signature match the one from Elasticsearc]((https://github.com/vrcmarcos/elasticmock/pull/10) (Thanks [@xrmx](https://github.com/xrmx))
+- [Make the FakeElasticsearch __init__ signature match the one from Elasticsearch](https://github.com/vrcmarcos/elasticmock/pull/10) (Thanks [@xrmx](https://github.com/xrmx))
 - [Improve search and count](https://github.com/vrcmarcos/elasticmock/pull/7) (Thanks [@frivoire](https://github.com/frivoire))
 
 #### 1.3.2
